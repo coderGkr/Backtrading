@@ -79,8 +79,9 @@ def PrintResult(df,txList):
 	print("Total Profit : {}".format(totalProfit))
 	print("Total Loss : {}".format(totalLoss))
 	print("Cumulative Profit : {}".format(totalProfit-totalLoss))
-	print([sp/bp for (bp,sp) in txList])
-	print("Cumulative Profit Percentage : {}".format((np.mean([sp/bp for (bp,sp) in txList])-1)*100))
+	cprofitList = [1-sp/bp if sp/bp<1 else sp/bp-1 for (bp,sp) in txList]
+	print(cprofitList)
+	print("Cumulative Profit Percentage : {}".format(np.mean(cprofitList)*100))
 	return
 
 def EmaCrossOver(df):
@@ -110,12 +111,53 @@ def EmaCrossOver(df):
 	plt.show()
 	PrintResult(df,txList)
 
+def MultipleEmaCrossOver(df):
+	smallEmas = [5,10,15,25]
+	largeEmas = [45,60,75,100]
+	for ema in smallEmas+largeEmas:
+		EMA(df,ema,"Adj Close")
+
+	import pdb
+	pdb.set_trace()
+	buy = False
+	bp = 0
+	sp = 0
+	txList = []
+	for i in df.index:
+		minList = [df["Adj Close_EMA_{}".format(ema)][i] for ema in smallEmas]
+		maxList = [df["Adj Close_EMA_{}".format(ema)][i] for ema in largeEmas]
+		if not buy:
+			if min(minList) > max(maxList):
+				print("-"*100)
+				buy	= True
+				bp = df["Adj Close"][i]
+				print("Bought at Rs. {}".format(bp)) 
+		else:
+			if min(minList) < max(maxList):
+				buy = False
+				sp = df["Adj Close"][i]
+				txList.append((bp,sp))
+				print("Sold at Rs. {} Profit Rs.{}".format(sp,sp-bp))
+
+	ax = df.plot(y="Adj Close")
+	for ema in smallEmas:
+		df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='green')
+	for ema in largeEmas:
+		df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='red')
+	plt.show()
+
+
+	#ax = df.plot(y="Adj Close")
+	# ax=df.plot(y="Adj Close_EMA_30")
+	# df.plot(ax=ax,y="Adj Close_EMA_10")
+	# plt.show()
+	PrintResult(df,txList)
 
 
 
 def main():
 	global stock
-	stock = "RELIANCE.NS"
+	stock = "QCOM"
 	yf.pdr_override()
 	start = dt.datetime(2015,2,20)
 	end = dt.datetime.now()
@@ -134,7 +176,8 @@ def main():
 	# pdb.set_trace()
 
 	#RSIStrategy(df)
-	EmaCrossOver(df)
+	#EmaCrossOver(df)
+	MultipleEmaCrossOver(df)
 
 
 
