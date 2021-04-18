@@ -4,7 +4,7 @@ import yfinance as yf
 import datetime as dt
 from pandas_datareader import data as pdr
 import matplotlib.pyplot as plt
-
+from functools import reduce
 
 global stock
 
@@ -76,13 +76,20 @@ def PrintResult(df,txList):
 	print("Total number of Losing trades : {}".format(len(lossList)))
 	totalProfit = sum(prlist)
 	totalLoss = sum(lossList)
+	cProfit = totalProfit-totalLoss
 	print("Total Profit : {}".format(totalProfit))
 	print("Total Loss : {}".format(totalLoss))
-	print("Cumulative Profit : {}".format(totalProfit-totalLoss))
+	print("Cumulative Profit : {}".format(cProfit))
 	cprofitList = [1-sp/bp if sp/bp<1 else sp/bp-1 for (bp,sp) in txList]
 	print(cprofitList)
-	print("Cumulative Profit Percentage : {}".format(np.mean(cprofitList)*100))
-	return
+	print("Mean Profit Percentage : {}".format(np.mean(cprofitList)*100))
+	# import pdb
+	# pdb.set_trace()
+	CD = max([e[0] for e in txList])
+	print("Max Capital Employed : {}".format(CD))
+	profitPercentage = round((cProfit/CD)*100,2)
+	print("Profit Percentage : {}%".format(profitPercentage))
+	return profitPercentage
 
 def EmaCrossOver(df):
 	EMA(df,10,"Adj Close")
@@ -117,12 +124,12 @@ def MultipleEmaCrossOver(df):
 	for ema in smallEmas+largeEmas:
 		EMA(df,ema,"Adj Close")
 
-	import pdb
-	pdb.set_trace()
 	buy = False
 	bp = 0
 	sp = 0
 	txList = []
+	df["buy"] = np.nan
+	df["sell"] = np.nan
 	for i in df.index:
 		minList = [df["Adj Close_EMA_{}".format(ema)][i] for ema in smallEmas]
 		maxList = [df["Adj Close_EMA_{}".format(ema)][i] for ema in largeEmas]
@@ -131,39 +138,69 @@ def MultipleEmaCrossOver(df):
 				print("-"*100)
 				buy	= True
 				bp = df["Adj Close"][i]
-				print("Bought at Rs. {}".format(bp)) 
+				print("Bought at Rs. {}".format(bp))
+				df["buy"][i] =  df["Adj Close"][i]
 		else:
 			if min(minList) < max(maxList):
 				buy = False
 				sp = df["Adj Close"][i]
 				txList.append((bp,sp))
+				df["sell"][i] =  df["Adj Close"][i]
 				print("Sold at Rs. {} Profit Rs.{}".format(sp,sp-bp))
-
-	ax = df.plot(y="Adj Close")
-	for ema in smallEmas:
-		df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='green')
-	for ema in largeEmas:
-		df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='red')
-	plt.show()
 
 
 	#ax = df.plot(y="Adj Close")
 	# ax=df.plot(y="Adj Close_EMA_30")
 	# df.plot(ax=ax,y="Adj Close_EMA_10")
 	# plt.show()
-	PrintResult(df,txList)
+	returns =  PrintResult(df,txList)
+	# import pdb
+	# pdb.set_trace()
+
+
+
+	ax = df.plot(y="Adj Close")
+	plt.scatter(x=df.index,y=df["buy"],color="green")
+	plt.scatter(x=df.index,y=df["sell"],color="red")
+	#df.plot(ax=ax,y=buy)
+	
+	# for ema in smallEmas:
+	# 	df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='green')
+	# for ema in largeEmas:
+	# 	df.plot(ax=ax,y="Adj Close_EMA_{}".format(ema),color='red')
+	plt.show()
+
+	return returns
 
 
 
 def main():
 	global stock
-	stock = "QCOM"
+	niftyStocks = ['ADANIPORTS', 'ASIANPAINT', 'AXISBANK', 'BAJAJ-AUTO', 'BAJFINANCE', 'BAJAJFINSV', 'BPCL', 'BHARTIARTL', 'BRITANNIA', 'CIPLA', 'COALINDIA', 'DIVISLAB', 'DRREDDY', 'EICHERMOT', 'GRASIM', 'HCLTECH', 'HDFCBANK', 'HDFCLIFE', 'HEROMOTOCO', 'HINDALCO', 'HINDUNILVR', 'HDFC', 'ICICIBANK', 'ITC', 'IOC', 'INDUSINDBK', 'INFY', 'JSWSTEEL', 'KOTAKBANK', 'LT', 'M&M', 'MARUTI', 'NTPC', 'NESTLEIND', 'ONGC', 'POWERGRID', 'RELIANCE', 'SBILIFE', 'SHREECEM', 'SBIN', 'SUNPHARMA', 'TCS', 'TATACONSUM', 'TATAMOTORS', 'TATASTEEL', 'TECHM', 'TITAN', 'UPL', 'ULTRACEMCO', 'WIPRO']
+	
 	yf.pdr_override()
 	start = dt.datetime(2015,2,20)
 	end = dt.datetime.now()
+	ofil = r"C:\Users\Gopikrishnan R\Documents\PYBACKTEST\out.csv"
+
+	#single stock
+	df =  pdr.get_data_yahoo("SBIN.NS",start,end)
+	returns = MultipleEmaCrossOver(df)
+
 	#df =  pdr.get_data_yahoo(stock,start,end)
-	df = pdr.get_data_yahoo(stock,start,end)
-	
+	# with open(ofil,'w') as of:
+	# 	for stock in niftyStocks:
+
+	# 		#skip this
+	# 		if stock in ["BHARTIARTL"]:
+	# 			continue
+
+	# 		stock = stock+".NS"
+	# 		print("Processing for STOCK : {}".format(stock))
+	# 		df = pdr.get_data_yahoo(stock,start,end)
+	# 		returns = MultipleEmaCrossOver(df)
+	# 		of.write(stock+","+str(returns)+"\n")
+
 
 
 	# fig, axes = plt.subplots(nrows=2, ncols=1)
@@ -177,7 +214,7 @@ def main():
 
 	#RSIStrategy(df)
 	#EmaCrossOver(df)
-	MultipleEmaCrossOver(df)
+	
 
 
 
